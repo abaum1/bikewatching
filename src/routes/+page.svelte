@@ -142,20 +142,19 @@
 	$: filteredDepartures = filterByMinute(departuresByMinute, timeFilter);
 	$: filteredArrivals = filterByMinute(arrivalsByMinute, timeFilter);
 
+
+	// Need to convert the array to an object first to call .get()
 	$: filteredDeparturesAggregate = d3.rollup(
 		filteredDepartures,
-		(v) => v.length,
-		(d) => d.start_station_id,
+		v => v.length,
+		d => d.start_station_id,
 	);
 	$: filteredArrivalsAggregate = d3.rollup(
 		filteredArrivals,
-		(v) => v.length,
-		(d) => d.end_station_id,
+		v => v.length,
+		d => d.end_station_id,
 	);
-	console.log("timeFilterLabel", timeFilterLabel);
-	console.log("filteredArrivalsAggregate", filteredArrivalsAggregate);
-	console.log("arrivalsByMinute", arrivalsByMinute);
-	console.log("filteredArrivals", filteredArrivals);
+
 
 	$: stations =
 		timeFilter === -1
@@ -163,14 +162,14 @@
 			: stations.map((station) => {
 					station = { ...station }; // Clone to avoid mutating the original
 					let id = station.Number;
-					station.departures = filteredDepartures.get(id) ?? 0;
-					station.arrivals = filteredArrivals.get(id) ?? 0;
+					station.departures = filteredDeparturesAggregate.get(id) ?? 0;
+					station.arrivals = filteredArrivalsAggregate.get(id) ?? 0;
 					station.totalTraffic =
 						station.departures + station.arrivals;
 					return station;
 				});
 
-	console.log("timeFilter", timeFilter);
+	// console.log("timeFilter", timeFilter);
 </script>
 
 <svelte:head>
@@ -180,16 +179,14 @@
 
 <h1>Bikewatching</h1>
 <header class="timeselector">
-	<label>Filter by time of day:</label>
-	<input type="range" min="-1" max="1440" bind:value={timeFilter} />
-	{#if timeFilter == -1}
-		<!-- <time>{timeFilterLabel}</time> -->
-		<em>(any time)</em>
-	{:else}
-		<time>
-			{timeFilterLabel}
-		</time>
-	{/if}
+    Filter by time:
+    <input type="range" min="-1" max="1440" bind:value={timeFilter}>
+    <time> 
+		<!-- the fact that the timeFilterLabel label is abstracted into a variable means that it is just -->
+		<!-- litening to the timeFilter but not blocking timeFilter execution. When I had the reactive component here
+		it was reevaluating each time the input was revalutaing the ternary and causing jittery.-->
+        { timeFilterLabel }
+    </time>
 </header>
 <p>
 	This is an immersive visualization map of bike traffic in the Boston area.
