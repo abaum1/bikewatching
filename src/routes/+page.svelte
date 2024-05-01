@@ -21,6 +21,8 @@
 	const TRIP_DATA_URL =
 		"https://vis-society.github.io/labs/8/data/bluebikes-traffic-2024-03.csv";
 
+	let stationFlow = d3.scaleQuantize().domain([0, 1]).range([0, 0.5, 1]);
+
 	onMount(async () => {
 		// Wrap the map creation in a try-catch block to handle any potential errors
 		try {
@@ -142,19 +144,17 @@
 	$: filteredDepartures = filterByMinute(departuresByMinute, timeFilter);
 	$: filteredArrivals = filterByMinute(arrivalsByMinute, timeFilter);
 
-
 	// Need to convert the array to an object first to call .get()
 	$: filteredDeparturesAggregate = d3.rollup(
 		filteredDepartures,
-		v => v.length,
-		d => d.start_station_id,
+		(v) => v.length,
+		(d) => d.start_station_id,
 	);
 	$: filteredArrivalsAggregate = d3.rollup(
 		filteredArrivals,
-		v => v.length,
-		d => d.end_station_id,
+		(v) => v.length,
+		(d) => d.end_station_id,
 	);
-
 
 	$: stations =
 		timeFilter === -1
@@ -162,7 +162,8 @@
 			: stations.map((station) => {
 					station = { ...station }; // Clone to avoid mutating the original
 					let id = station.Number;
-					station.departures = filteredDeparturesAggregate.get(id) ?? 0;
+					station.departures =
+						filteredDeparturesAggregate.get(id) ?? 0;
 					station.arrivals = filteredArrivalsAggregate.get(id) ?? 0;
 					station.totalTraffic =
 						station.departures + station.arrivals;
@@ -179,14 +180,14 @@
 
 <h1>Bikewatching</h1>
 <header class="timeselector">
-    Filter by time:
-    <input type="range" min="-1" max="1440" bind:value={timeFilter}>
-    <time> 
+	Filter by time:
+	<input type="range" min="-1" max="1440" bind:value={timeFilter} />
+	<time>
 		<!-- the fact that the timeFilterLabel label is abstracted into a variable means that it is just -->
 		<!-- litening to the timeFilter but not blocking timeFilter execution. When I had the reactive component here
 		it was reevaluating each time the input was revalutaing the ternary and causing jittery.-->
-        { timeFilterLabel }
-    </time>
+		{timeFilterLabel}
+	</time>
 </header>
 <p>
 	This is an immersive visualization map of bike traffic in the Boston area.
@@ -196,6 +197,9 @@
 		<svg>
 			{#each stations as station}
 				<circle
+					style="--departure-ratio: {stationFlow(
+						station.departures / station.totalTraffic,
+					)}"
 					{...getCoords(station)}
 					r={radiusScale(station.totalTraffic)}
 					fill="steelblue"
@@ -210,8 +214,37 @@
 	{/key}
 </div>
 
+<div class="legend">
+	<div class="legend-item">
+		<div
+			class="legend-dot"
+			style="--dot-color: var(--color-departures)"
+		></div>
+		<div>More departures</div>
+	</div>
+	<div class="legend-item">
+		<div
+			class="legend-dot"
+			style="--dot-color: color-mix(in oklch, var(--color-departures) 50%, var(--color-arrivals))"
+		></div>
+		<div>Balanced</div>
+	</div>
+	<div class="legend-item">
+		<div
+			class="legend-dot"
+			style="--dot-color: var(--color-arrivals)"
+		></div>
+		<div>More arrivals</div>
+	</div>
+</div>
+
 <style>
 	@import url("$lib/global.css");
+
+	:root {
+		--color-departures: steelblue;
+		--color-arrivals: darkorange;
+	}
 	#map {
 		flex: 1;
 		background-color: yellowgreen;
@@ -222,11 +255,17 @@
 		position: absolute;
 		z-index: 1;
 		pointer-events: none;
-
 		circle {
 			pointer-events: auto;
 			fill-opacity: 60%;
 			stroke: white;
+
+			--color: color-mix(
+				in oklch,
+				var(--color-departures) calc(100% * var(--departure-ratio)),
+				var(--color-arrivals)
+			);
+			fill: var(--color);
 		}
 	}
 	.timeselector {
@@ -245,5 +284,25 @@
 	}
 	time {
 		display: block;
+	}
+
+	.legend {
+		display: flex;
+		justify-content: space-around;
+		align-items: center;
+		margin-top: 20px;
+	}
+
+	.legend-item {
+		display: flex;
+		align-items: center;
+	}
+
+	.legend-dot {
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		margin-right: 5px;
+		background-color: var(--dot-color);
 	}
 </style>
